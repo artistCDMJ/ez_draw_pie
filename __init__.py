@@ -21,13 +21,13 @@
 
 # <pep8 compliant>
 
-bl_info = {"name": "EasyDRAW Popup",
+bl_info = {"name": "EZ Draw Pie",
             "author": "CDMJ, Spirou4D",
-            "version": (1, 1),
+            "version": (1, 2),
             "blender": (2, 77, 0),
-            "location": "",
-            "description": "shortcut menu for EasyDRAW Artist Panel addon Plus”",
-            "warning": "",
+            "location": "F7 in Texture Paint Mode",
+            "description": "Pie Menu for EZ Draw addon",
+            "warning": "Run only in BI now",
             "wiki_url": "",
             "category": "Paint"}
 
@@ -45,11 +45,11 @@ SEP = os.sep
 def get_addon_prefs_corr():
     Addons = bpy.context.user_preferences.addons
     for i in Addons:
-        if Addons.find('easy_draw') != -1:
-            key = 'easy_draw'
+        if Addons.find('ez_draw') != -1:
+            key = 'ez_draw'
             break
-        elif Addons.find('easy_draw-master') != -1:
-            key = 'easy_draw-master'
+        elif Addons.find('ez_draw-master') != -1:
+            key = 'ez_draw-master'
             break
         else:
             return -1
@@ -73,8 +73,8 @@ def pollAPT(self, context):
         return obj.name == main_canvas_name
 
 class canvasPopup(Operator):
-    bl_idname = "easy_draw.popup"
-    bl_label = "EasyDRAW Popup"
+    bl_idname = "ez_draw.popup"
+    bl_label = "EZ Draw Popup"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -98,13 +98,19 @@ class canvasPopup(Operator):
         #"EASY_DRAW_OT_popup"
         addon_prefs = get_addon_prefs_corr()
         if addon_prefs == -1:
-            print("You must install the 'EasyDRAW Artist Paint Panel' Add-On, please")
+            print("You must install the 'EZ DRAW' Add-On, please")
             return {'FINISHED'}
 
         scene =context.scene
         CustomAngle  = str(addon_prefs.customAngle)
         toolsettings = context.tool_settings
         ipaint = toolsettings.image_paint
+        
+        stencil_text = ""
+        if context.active_object is not None :
+            ob = context.active_object
+            if ob.type == 'MESH' and ob.data.uv_texture_stencil is not None :
+                stencil_text = ob.data.uv_texture_stencil.name
 
         mask_V_align = scene.mask_V_align
         buttName_1 = CustomAngle +"°"
@@ -115,19 +121,40 @@ class canvasPopup(Operator):
 
         row = layout.row(align = True)
         row1 = row.split(align=True)
-        row1.label("Shading")
+        row1.label(" ")
         row2 = row.split(align=True)
         if scene.game_settings.material_mode == 'GLSL':
             row2.operator("artist_paint.multitexture",
-                    text='', icon="RADIO")
+                    text='Shading', icon="RADIO")
         else:
             row2.operator("artist_paint.glsl",
-                    text='', icon="RENDERLAYERS")
-        row2.scale_x = 1.00
+                    text='Shading', icon="RENDERLAYERS")
+        row2.scale_x = 0.40
+
 
         box = layout.box()
-        col = box.column()
-        col.label("Objects Masking Tools")
+        col = box.column(align=True)
+        col.label("CANVAS MASKING TOOLS")
+        col.prop(ipaint, "use_stencil_layer", text="Stencil mask")
+        if ipaint.use_stencil_layer:
+            col.menu("VIEW3D_MT_tools_projectpaint_stencil", text=stencil_text, translate=False)
+            col.template_ID(ipaint, "stencil_image", open="image.open")
+            col.operator("image.new", text="New stencil").gen_context = 'PAINT_STENCIL'
+            row = col.row(align = True)
+            row.prop(ipaint, "stencil_color", text="")
+            row.prop(ipaint, "invert_stencil",
+                        text="Invert the mask",
+                        icon='IMAGE_ALPHA')
+        
+        
+        col.separator()                             #empty line
+        
+        row = col.row(align = True)
+        row.operator("artist_paint.sculpt_duplicate", text = "Sculpt Duplicate", icon = 'COPY_ID')
+        row.operator("artist_paint.sculpt_liquid", text = "Sculpt Liquid", icon = 'MOD_WAVE')
+        
+        col.separator()                             #empty line
+        
         col.operator("artist_paint.trace_selection",
                     text = "Mask from Gpencil",
                     icon = 'OUTLINER_OB_MESH')
@@ -147,24 +174,65 @@ class canvasPopup(Operator):
                     icon = 'MOD_TRIANGULATE')
 
         col.separator()                             #empty line
-
-        col.prop(ipaint, "use_stencil_layer",
-                                text="Stencil mask")
-        if ipaint.use_stencil_layer == True:
-            cel = col.column(align = True)
-            cel.template_ID(ipaint, "stencil_image")
-            cel.operator("image.new", text="New").\
-                                        gen_context = 'PAINT_STENCIL'
-            row = cel.row(align = True)
-            row.prop(ipaint, "stencil_color", text="")
-            row.prop(ipaint, "invert_stencil",
-                        text="Invert the mask",
-                        icon='IMAGE_ALPHA')
-
-
+        
+        row = col.row(align = True)                        #BOOL MASK AND REUSE
+        row1 = row.split(align=True)
+        row1.label(text="Bool")
+        row1.scale_x = 0.30
+        row2 = row.split(align=True)
+        row2.operator("artist_paint.solidfy_difference", text=" Difference", icon = 'ROTACTIVE')
+        row2.operator("artist_paint.solidfy_union", text=" Union", icon = 'ROTATECOLLECTION')
+        row2.scale_x = 1.00
+        row.separator()
+        row3 = row.split(align=True)
+        row3.operator("artist_paint.reproject_mask",
+                          text=" Reproject", icon = 'NODE_SEL')
+        row3.scale_x = 1.10
+        row4 = row.split(align=True)
+        row4.operator("artist_paint.remove_modifiers", icon='RECOVER_LAST')
+    
+        col.separator()        #ALIGNEMENT
+        
+        col.label("Masks Alignment")        #ALIGNEMENT
+        row = col.row(align = True)        #TABLEAU
+    
+        row1 = row.split(align = True)                         #Column 1
+        row1.scale_x = 1.00
+        col1 = row1.column(align = True)
+        col1.label("")
+        col1.operator("object.align_left",
+                          text="Left", icon = 'TRIA_LEFT_BAR')
+        col1.label("")
+    
+    
+        row2 = row.split(align = True)                         #column 2
+        row2.scale_x = 1.00
+        col2 = row2.column(align = True)
+        col2.operator("object.align_top", text="Top", icon = 'TRIA_UP_BAR')
+        if mask_V_align:
+            col2.operator("object.align_hcenter",
+                              text="Center V", icon = 'GRIP')
+        else:
+            col2.operator("object.align_center",
+                              text="Center H", icon = 'PAUSE')
+        col2.operator("object.align_bottom",
+                          text="Bottom", icon = 'TRIA_DOWN_BAR')
+        col2.operator("object.center_align_reset", icon='RECOVER_LAST')
+    
+    
+        row3 = row.split(align = True)                         #column 3
+        row3.scale_x = 1.00
+        col3 = row3.column(align = True)
+        col3.label("")
+        col3.operator("object.align_right",
+                          text="Right", icon = 'TRIA_RIGHT_BAR')
+        col3.label("")
+        
+        col.separator()                             #empty line
 
         box = layout.box()                        #CANVAS FRAME CONSTRAINT
         col = box.column(align = True)
+        col.label(text="CANVAS MOVEMENT")
         row = col.row(align = True)
         row1 = row.split(align=True)
         row1.label(text="Mirror")
@@ -178,6 +246,7 @@ class canvasPopup(Operator):
         row3 = row.split(align=True)
         row3.operator("artist_paint.set_symmetry_origin",
                     text="New", icon='VIEW3D_VEC')
+        row3.scale_x = 0.60
         row4 = row.split(align=True)
         row4.operator("artist_paint.reset_origin",
                     text="", icon='RECOVER_AUTO')
@@ -215,7 +284,7 @@ class canvasPopup(Operator):
                     text = "Reset Rotation", icon = 'CANCEL')
 
 #nested pie
-class OperNested(bpy.types.Operator):
+class OperNested(Operator):
     """Tooltip"""
     bl_idname = "object.oper_nested"
     bl_label = "Operator Nested"
@@ -238,11 +307,11 @@ class VIEW3D_PIE_artistpaint(Menu):
         layout = self.layout
 
         pie = layout.menu_pie()
-        pie.operator("slots.projectpaint", text='Slots', icon='COLLAPSEMENU')
-        pie.operator("view3d.brush_popup", text='Paint Brush', icon='BRUSH_DATA')
-        pie.operator("easy_draw.popup", text='Canvas Control', icon='TEXTURE')
-        pie.operator("object.oper_nested", text='Drawtype', icon='CANCEL')
         pie.operator("view3d.texture_popup", text='Tex Mapping', icon='TEXTURE')
+        pie.operator("view3d.brush_popup", text='Paint Brush', icon='BRUSH_DATA')
+        pie.operator("object.oper_nested", text='Drawtype', icon='CANCEL')
+        pie.operator("ez_draw.popup", text='Canvas Control', icon='TEXTURE')
+        pie.operator("view3d.projectpaint", text='Slots', icon='COLLAPSEMENU')
 
 
 
@@ -253,7 +322,7 @@ def register():
     for i in km_list:
         sm = bpy.context.window_manager
         km = sm.keyconfigs.default.keymaps[i]
-        kmi = km.keymap_items.new('wm.call_menu_pie', 'P', 'PRESS',)
+        kmi = km.keymap_items.new('wm.call_menu_pie', 'F7', 'PRESS')
         kmi.properties.name = "VIEW3D_PIE_artistpaint"
 
 
