@@ -21,57 +21,80 @@
 
 # <pep8 compliant>
 
-bl_info = {"name": "EZ Draw Pie",
+bl_info = {"name": "EZ_Draw Pie",
             "author": "CDMJ, Spirou4D",
-            "version": (1, 2),
-            "blender": (2, 77, 0),
-            "location": "F7 in Texture Paint Mode",
+            "version": (2, 30),
+            "blender": (2, 78, 0),
+            "location": "Os key + W",
             "description": "Pie Menu for EZ Draw addon",
             "warning": "Run only in BI now",
             "wiki_url": "",
             "category": "Paint"}
 
 import bpy
-from bpy.types import   AddonPreferences,\
-                        Menu,\
-                        Panel,\
-                        UIList,\
-                        Operator
+from bpy.types import   Operator, Menu
+
 import math
 import os
 SEP = os.sep
 
-#-------------------------------------------New: get the addon preferences
-def get_addon_prefs_corr():
+
+########################
+#      Functions       #
+########################
+#------------------------------------------------------GET THE ADDON PREFERENCES
+def get_addon_prefs_corr(key):
     Addons = bpy.context.user_preferences.addons
+
     for i in Addons:
-        if Addons.find('ez_draw') != -1:
-            key = 'ez_draw'
+        if Addons.find(key) != -1:
             break
-        elif Addons.find('ez_draw-master') != -1:
-            key = 'ez_draw-master'
+        elif Addons.find(key+'-master') != -1:
+            key = key+'-master'
             break
         else:
             return -1
+
     return Addons[key].preferences
 
-def pollAPT(self, context):
+
+def main_canvas_data(self, context):
     scene = context.scene
+    #default datas
+    name = ext = filepath = dimX = dimY = ''
+
+    if scene.ezdraw is not None:                    #if main canvas isn't erased
+        if len(scene.ezdraw) > 0:
+            for main_canvas in scene.ezdraw:           #look for the main canvas
+                name = (main_canvas.filename)[:-4]
+                ext = (main_canvas.filename)[-4:]
+                filepath = main_canvas.path
+                dimX = main_canvas.dimX
+                dimY =  main_canvas.dimY
+
+    return [name, ext, filepath, dimX, dimY]
+
+
+#----------------------------------------------------------------NOT YET USED !!
+def poll_apt(self, context):
+    scene = context.scene
+    #Init
     obj =  context.active_object
     empty = scene.maincanvas_is_empty
-    main_canvas_name = ""
+    main_canvas = main_canvas_data(self, context)
 
-    if not(empty):
-        if scene.artist_paint is not None:
-            if len(scene.artist_paint) !=0:
-                for main_canvas in scene.artist_paint:
-                    main_canvas_name = (main_canvas.filename)[:-4]
-    else:
+    if empty or main_canvas[0] == '':
         return False
 
     if obj is not None:
-        return obj.name == main_canvas_name
+        return obj.name == main_canvas[0]
+    else:
+        return  False
 
+
+########################
+#      CLASSES         #
+########################
 class canvasPopup(Operator):
     bl_idname = "ez_draw.popup"
     bl_label = "EZ Draw Popup"
@@ -95,8 +118,7 @@ class canvasPopup(Operator):
         return {'FINISHED'}
 
     def draw(self, context):
-        #"EASY_DRAW_OT_popup"
-        addon_prefs = get_addon_prefs_corr()
+        addon_prefs = get_addon_prefs_corr('ez_draw')
         if addon_prefs == -1:
             print("You must install the 'EZ DRAW' Add-On, please")
             return {'FINISHED'}
@@ -105,7 +127,7 @@ class canvasPopup(Operator):
         CustomAngle  = str(addon_prefs.customAngle)
         toolsettings = context.tool_settings
         ipaint = toolsettings.image_paint
-        
+
         stencil_text = ""
         if context.active_object is not None :
             ob = context.active_object
@@ -117,17 +139,17 @@ class canvasPopup(Operator):
         buttName_2 = CustomAngle +"°"
 
         layout = self.layout
-        layout.active = context.scene.UI_is_activated
+        layout.active = layout.enabled = context.scene.ui_is_activated
 
         row = layout.row(align = True)
         row1 = row.split(align=True)
         row1.label(" ")
         row2 = row.split(align=True)
         if scene.game_settings.material_mode == 'GLSL':
-            row2.operator("artist_paint.multitexture",
+            row2.operator("ez_draw.multitexture",
                     text='Shading', icon="RADIO")
         else:
-            row2.operator("artist_paint.glsl",
+            row2.operator("ez_draw.glsl",
                     text='Shading', icon="RENDERLAYERS")
         row2.scale_x = 0.40
 
@@ -135,155 +157,162 @@ class canvasPopup(Operator):
         box = layout.box()
         col = box.column(align=True)
         col.label("CANVAS MASKING TOOLS")
+
         col.prop(ipaint, "use_stencil_layer", text="Stencil mask")
         if ipaint.use_stencil_layer:
-            col.menu("VIEW3D_MT_tools_projectpaint_stencil", text=stencil_text, translate=False)
+            col.menu("VIEW3D_MT_tools_projectpaint_stencil", \
+                     text=stencil_text, translate=False)
             col.template_ID(ipaint, "stencil_image", open="image.open")
-            col.operator("image.new", text="New stencil").gen_context = 'PAINT_STENCIL'
+            col.operator("image.new", \
+                         text="New stencil").gen_context = 'PAINT_STENCIL'
             row = col.row(align = True)
             row.prop(ipaint, "stencil_color", text="")
             row.prop(ipaint, "invert_stencil",
                         text="Invert the mask",
                         icon='IMAGE_ALPHA')
-        
-        
+
         col.separator()                             #empty line
-        
+
         row = col.row(align = True)
-        row.operator("artist_paint.sculpt_duplicate", text = "Sculpt Duplicate", icon = 'COPY_ID')
-        row.operator("artist_paint.sculpt_liquid", text = "Sculpt Liquid", icon = 'MOD_WAVE')
-        
+        row.operator("ez_draw.sculpt_duplicate", \
+                     text = "Sculpt Duplicate", \
+                     icon = 'COPY_ID')
+        row.operator("ez_draw.sculpt_liquid", \
+                     text = "Sculpt Liquid", \
+                     icon = 'MOD_WAVE')
+
         col.separator()                             #empty line
-        
-        col.operator("artist_paint.trace_selection",
-                    text = "Mask from Gpencil",
+
+        col.operator("ez_draw.trace_selection", \
+                    text = "Mask from Gpencil", \
                     icon = 'OUTLINER_OB_MESH')
 
         col.separator()                             #empty line
 
-        col.operator("artist_paint.curve_2dpoly",
-                    text = "Make Vector Contour",
+        col.operator("ez_draw.curve_2dpoly", \
+                    text = "Make Vector Contour", \
                     icon = 'PARTICLE_POINT')
 
         row = col.row(align = True)
-        row.operator("artist_paint.curve_unwrap",
-                    text = "To Mesh Mask",
+        row.operator("ez_draw.curve_unwrap", \
+                    text = "To Mesh Mask", \
                     icon = 'OUTLINER_OB_MESH')
-        row.operator("artist_paint.inverted_mask",
-                    text = "To Inverted Mesh Mask",
+        row.operator("ez_draw.inverted_mask", \
+                    text = "To Inverted Mesh Mask", \
                     icon = 'MOD_TRIANGULATE')
 
         col.separator()                             #empty line
-        
-        row = col.row(align = True)                        #BOOL MASK AND REUSE
+
+        row = col.row(align = True)                         #BOOL MASK AND REUSE
         row1 = row.split(align=True)
         row1.label(text="Bool")
         row1.scale_x = 0.30
         row2 = row.split(align=True)
-        row2.operator("artist_paint.solidfy_difference", text=" Difference", icon = 'ROTACTIVE')
-        row2.operator("artist_paint.solidfy_union", text=" Union", icon = 'ROTATECOLLECTION')
+        row2.operator("ez_draw.solidfy_difference", \
+                      text=" Difference", icon = 'ROTACTIVE')
+        row2.operator("ez_draw.solidfy_union", \
+                      text=" Union", \
+                      icon = 'ROTATECOLLECTION')
         row2.scale_x = 1.00
         row.separator()
         row3 = row.split(align=True)
-        row3.operator("artist_paint.reproject_mask",
+        row3.operator("ez_draw.reproject_mask", \
                           text=" Reproject", icon = 'NODE_SEL')
         row3.scale_x = 1.10
         row4 = row.split(align=True)
-        row4.operator("artist_paint.remove_modifiers", icon='RECOVER_LAST')
-    
-        col.separator()        #ALIGNEMENT
-        
-        col.label("Masks Alignment")        #ALIGNEMENT
-        row = col.row(align = True)        #TABLEAU
-    
-        row1 = row.split(align = True)                         #Column 1
+        row4.operator("ez_draw.remove_modifiers", icon='RECOVER_LAST')
+
+        col.separator()                             #empty line
+
+        col.label("Masks Alignment")                                 #ALIGNEMENT
+        row = col.row(align = True)                                     #TABLEAU
+
+        row1 = row.split(align = True)                                 #Column 1
         row1.scale_x = 1.00
         col1 = row1.column(align = True)
         col1.label("")
-        col1.operator("object.align_left",
+        col1.operator("object.align_left", \
                           text="Left", icon = 'TRIA_LEFT_BAR')
         col1.label("")
-    
-    
-        row2 = row.split(align = True)                         #column 2
+
+
+        row2 = row.split(align = True)                                 #column 2
         row2.scale_x = 1.00
         col2 = row2.column(align = True)
         col2.operator("object.align_top", text="Top", icon = 'TRIA_UP_BAR')
         if mask_V_align:
-            col2.operator("object.align_hcenter",
+            col2.operator("object.align_hcenter", \
                               text="Center V", icon = 'GRIP')
         else:
-            col2.operator("object.align_center",
+            col2.operator("object.align_center", \
                               text="Center H", icon = 'PAUSE')
-        col2.operator("object.align_bottom",
+        col2.operator("object.align_bottom", \
                           text="Bottom", icon = 'TRIA_DOWN_BAR')
         col2.operator("object.center_align_reset", icon='RECOVER_LAST')
-    
-    
-        row3 = row.split(align = True)                         #column 3
+
+
+        row3 = row.split(align = True)                                 #column 3
         row3.scale_x = 1.00
         col3 = row3.column(align = True)
         col3.label("")
-        col3.operator("object.align_right",
+        col3.operator("object.align_right", \
                           text="Right", icon = 'TRIA_RIGHT_BAR')
         col3.label("")
-        
+
         col.separator()                             #empty line
 
-        box = layout.box()                        #CANVAS FRAME CONSTRAINT
+        box = layout.box()                              #canvas frame constraint
         col = box.column(align = True)
         col.label(text="CANVAS MOVEMENT")
         row = col.row(align = True)
         row1 = row.split(align=True)
         row1.label(text="Mirror")
         row1.scale_x = 0.60
-        row.separator()
+        row.separator()                             #empty line
         row2 = row.split(align=True)
         row2.prop(ipaint, "use_symmetry_x", text="Hor.", toggle=True)
         row2.prop(ipaint, "use_symmetry_y", text="Ver.", toggle=True)
         row2.scale_x = 0.70
         row.separator()
         row3 = row.split(align=True)
-        row3.operator("artist_paint.set_symmetry_origin",
-                    text="New", icon='VIEW3D_VEC')
+        row3.operator("ez_draw.set_symmetry_origin",
+                    text="New", icon='ERROR')  #corrected later!!!
         row3.scale_x = 0.60
         row4 = row.split(align=True)
-        row4.operator("artist_paint.reset_origin",
+        row4.operator("ez_draw.reset_origin",
                     text="", icon='RECOVER_AUTO')
 
-        col.separator()
+        col.separator()                             #empty line
 
         row = col.row(align = True)
-        row.operator("artist_paint.canvas_horizontal",
-                    text="Canvas Flip Horizontal",
-                    icon='ARROW_LEFTRIGHT')
-        row.operator("artist_paint.canvas_vertical",
-                    text = "Canvas Flip Vertical",
-                    icon = 'FILE_PARENT')
+        row.operator("ez_draw.canvas_horizontal",
+                    text="Canvas Flip Horizontal", icon='ARROW_LEFTRIGHT')
+        row.operator("ez_draw.canvas_vertical",
+                    text = "Canvas Flip Vertical", icon = 'FILE_PARENT')
 
 
-        row = col.row(align = True)                    #ROTATION
+        row = col.row(align = True)                                    #rotation
         row.label(text="Rotation")
         row.prop(context.scene, "canvas_in_frame" ,
                                     text="Frame Constraint")
-        row.enabled = pollAPT(self, context)
+        row.enabled = poll_apt(self, context)
 
         row = col.row(align = True)
-        row.operator("artist_paint.rotate_ccw_15",
+        row.operator("ez_draw.rotate_ccw_15",
                     text = "Rotate -" + buttName_1, icon = 'TRIA_LEFT')
-        row.operator("artist_paint.rotate_cw_15",
+        row.operator("ez_draw.rotate_cw_15",
                     text = "Rotate +" + buttName_2, icon = 'TRIA_RIGHT')
 
         row = col.row(align = True)
-        row.operator("artist_paint.rotate_ccw_90",
+        row.operator("ez_draw.rotate_ccw_90",
                     text = "Rotate 90° CCW", icon = 'PREV_KEYFRAME')
-        row.operator("artist_paint.rotate_cw_90",
+        row.operator("ez_draw.rotate_cw_90",
                     text = "Rotate 90° CW", icon = 'NEXT_KEYFRAME')
 
-        col.operator("artist_paint.canvas_resetrot",
+        col.operator("ez_draw.canvas_resetrot",
                     text = "Reset Rotation", icon = 'CANCEL')
 
-#nested pie
+#---------------------------------------------------------------------NESTED PIE
 class OperNested(Operator):
     """Tooltip"""
     bl_idname = "object.oper_nested"
@@ -295,13 +324,14 @@ class OperNested(Operator):
 
     def execute(self, context):
         bpy.ops.wm.call_menu_pie(name="VIEW3D_PIE_drawtypes")
+
         return {'FINISHED'}
 
 
-#------------------------------------#pie for paint2d
-class VIEW3D_PIE_artistpaint(Menu):
+#--------------------------------------------------------------- PIE FOR EZ DRAW
+class VIEW3D_PIE_ezdraw(Menu):
     # label is displayed at the center of the pie menu.
-    bl_label = "PAINTER"
+    bl_label = "EZ DRAW"
 
     def draw(self, context):
         layout = self.layout
@@ -314,7 +344,9 @@ class VIEW3D_PIE_artistpaint(Menu):
         pie.operator("view3d.projectpaint", text='Slots', icon='COLLAPSEMENU')
 
 
-
+########################
+#      REGISTER       #
+########################
 def register():
     bpy.utils.register_module(__name__)
 
@@ -323,9 +355,7 @@ def register():
         sm = bpy.context.window_manager
         km = sm.keyconfigs.default.keymaps[i]
         kmi = km.keymap_items.new('wm.call_menu_pie', 'F7', 'PRESS')
-        kmi.properties.name = "VIEW3D_PIE_artistpaint"
-
-
+        kmi.properties.name = "VIEW3D_PIE_ezdraw"
 
 def unregister():
     bpy.utils.unregister_module(__name__)
@@ -335,10 +365,8 @@ def unregister():
         sm = bpy.context.window_manager
         km = sm.keyconfigs.default.keymaps[i]
         for kmi in (kmi for kmi in km.keymap_items \
-                            if (kmi.idname == "VIEW3D_PIE_artistpaint")):
+                            if (kmi.idname == "VIEW3D_PIE_ezdraw")):
             km.keymap_items.remove(kmi)
-
-
 
 if __name__ == "__main__":
     register()
