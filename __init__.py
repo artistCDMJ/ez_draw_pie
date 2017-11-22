@@ -276,7 +276,7 @@ class canvasPopup(Operator):
         row.separator()
         row3 = row.split(align=True)
         row3.operator("ez_draw.set_symmetry_origin",
-                    text="New", icon='VIEW3D_VEC')
+                    text="New", icon='CURSOR')
         row3.scale_x = 0.60
         row4 = row.split(align=True)
         row4.operator("ez_draw.reset_origin",
