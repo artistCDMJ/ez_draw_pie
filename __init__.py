@@ -25,7 +25,7 @@ bl_info = {"name": "EZ_Draw Pie",
             "author": "CDMJ, Spirou4D",
             "version": (2, 30),
             "blender": (2, 78, 0),
-            "location": "Os key + W",
+            "location": "F7",
             "description": "Pie Menu for EZ Draw addon",
             "warning": "Run only in BI now",
             "wiki_url": "",
@@ -139,7 +139,7 @@ class canvasPopup(Operator):
         buttName_2 = CustomAngle +"°"
 
         layout = self.layout
-        layout.active = layout.enabled = context.scene.ui_is_activated
+        layout.active = context.scene.ui_is_activated
 
         row = layout.row(align = True)
         row1 = row.split(align=True)
@@ -276,7 +276,7 @@ class canvasPopup(Operator):
         row.separator()
         row3 = row.split(align=True)
         row3.operator("ez_draw.set_symmetry_origin",
-                    text="New", icon='ERROR')  #corrected later!!!
+                    text="New", icon='VIEW3D_VEC')
         row3.scale_x = 0.60
         row4 = row.split(align=True)
         row4.operator("ez_draw.reset_origin",
